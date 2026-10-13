@@ -5,4 +5,6 @@
 
 bool PasswordGenerator_GenerateCode(char *output, size_t bufferSize);
 
+bool PasswordGenerator_GeneratePlainTextPassword(char *output, size_t outputSize, char *code, size_t codeSize);
+
 #endif // MYF_PASSWORD_GENERATOR_H
