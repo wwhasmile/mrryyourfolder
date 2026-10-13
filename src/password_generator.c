@@ -21,7 +21,7 @@ bool PasswordGenerator_GenerateCode(char *output, size_t bufferSize)
 	return true;
 }
 
-bool PasswordGenerator_GeneratePlainTextPassword(char *output, size_t outputSize, char *code, size_t codeSize)
+void PasswordGenerator_GeneratePlainTextPassword(char *output, size_t outputSize, char *code, size_t codeSize)
 {
 	assert(output != NULL && outputSize > 0 && code != NULL && codeSize > 0);
 
@@ -34,6 +34,4 @@ bool PasswordGenerator_GeneratePlainTextPassword(char *output, size_t outputSize
 		uint32_t c = rand() % (('~' + 1) - '!') + '!';
 		output[i] = (char)c;
 	}
-
-	return true;
 }
