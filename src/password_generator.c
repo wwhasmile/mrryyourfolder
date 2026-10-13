@@ -1,9 +1,8 @@
 #include "password_generator.h"
 
-#include <Windows.h>
 #include <stdlib.h>
 
-#include <assert.h>
+#include <Windows.h>
 
 bool PasswordGenerator_GenerateCode(char *output, size_t bufferSize)
 {
