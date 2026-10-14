@@ -10,7 +10,8 @@ int main(int argc, char **argv)
 	PasswordGenerator_GeneratePlainTextPassword(password, 32, code, sizeof(uint64_t));
 
 	const wchar_t *ignore[] = { NULL };
-	Crypt_Encrypt(password, ignore);
+	if (Crypt_Encrypt(password, ignore))
+		Crypt_Decrypt(password, ignore);
 
 	printf("Code: %s, password: %s!", code, password);
 	return 0;
