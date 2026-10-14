@@ -105,6 +105,7 @@ BOOL Crypt_EncryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar
 				DeleteFile(wszFileName);
 		}
 	} while (FindNextFile(hFind, &findFileData));
+	FindClose(hFind);
 
 	return TRUE;
 }
@@ -336,6 +337,7 @@ BOOL Crypt_DecryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar
 				DeleteFile(wszFileName);
 		}
 	} while (FindNextFile(hFind, &findFileData));
+	FindClose(hFind);
 
 	return TRUE;
 }

