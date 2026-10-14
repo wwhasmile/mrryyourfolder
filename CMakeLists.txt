@@ -6,6 +6,7 @@ add_executable(mrryyourfolder)
 target_sources(mrryyourfolder
   PRIVATE
     src/password_generator.c
+    src/crypt.c
     src/main.c
   PRIVATE
     FILE_SET headers
