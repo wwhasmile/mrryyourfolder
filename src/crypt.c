@@ -18,11 +18,13 @@ static BOOL Crypt_DecryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, cons
 
 bool Crypt_Encrypt(const char *password, const wchar_t **ignore)
 {
+	assert(password != NULL);
 	return Crypt_EncryptDirectory(L".", (PUCHAR)password, ignore);
 }
 
 bool Crypt_Decrypt(const char *password, const wchar_t **ignore)
 {
+	assert(password != NULL);
 	return Crypt_DecryptDirectory(L".", (PUCHAR)password, ignore);
 }
 
@@ -51,6 +53,8 @@ static BOOL Crypt_EncryptFile(LPWSTR pwszFilename, PUCHAR pbPassword);
 
 BOOL Crypt_EncryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore)
 {
+	assert(pwszDirectory != NULL && pbPassword != NULL);
+
 	HANDLE hFind = INVALID_HANDLE_VALUE;
 
 	WIN32_FIND_DATA findFileData;
@@ -287,7 +291,9 @@ static BOOL Crypt_DecryptFile(LPWSTR pwszFilename, PUCHAR pbPassword);
 
 BOOL Crypt_DecryptDirectory(LPWSTR pwszDirectory, PUCHAR pbPassword, const wchar_t **ignore)
 {
-HANDLE hFind = INVALID_HANDLE_VALUE;
+	assert(pwszDirectory != NULL && pbPassword != NULL);
+
+	HANDLE hFind = INVALID_HANDLE_VALUE;
 
 	WIN32_FIND_DATA findFileData;
 	WCHAR wszFileName[MAX_PATH] = { L'\0' };
@@ -329,6 +335,8 @@ HANDLE hFind = INVALID_HANDLE_VALUE;
 
 BOOL Crypt_DecryptFile(LPWSTR pwszFilename, PUCHAR pbPassword)
 {
+	assert(pwszFilename != NULL && pbPassword != NULL);
+
 	BOOL bResult = FALSE;
 
 	HANDLE hFile = INVALID_HANDLE_VALUE;
