@@ -1,15 +1,20 @@
 #include "password_generator.h"
 
 #include <stdlib.h>
-
+#define UNICODE
 #include <Windows.h>
+
+#define NT_SUCCESS(status) (status >= 0)
 
 bool PasswordGenerator_GenerateCode(char *output, size_t bufferSize)
 {
 	assert(output != NULL && bufferSize > 0);
 
-	NTSTATUS status = BCryptGenRandom(BCRYPT_RNG_ALG_HANDLE, (PUCHAR)output, bufferSize, 0);
-	if (status != 0)
+	if (!NT_SUCCESS(BCryptGenRandom(
+			BCRYPT_RNG_ALG_HANDLE,
+			(PUCHAR)output,
+			bufferSize,
+			0)))
 		return false;
 
 	for (size_t i = 0; i < bufferSize; ++i) {
